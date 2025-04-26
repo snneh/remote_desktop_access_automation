@@ -2,7 +2,7 @@ import socket
 from pynput.mouse import Button, Controller
 
 HOST = input("Enter server IP: ")
-PORT = 12345
+PORT = 42069
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))

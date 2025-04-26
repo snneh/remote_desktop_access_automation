@@ -27,13 +27,13 @@ def connection_handler():
 def mouse_tracker():
     # Mouse event callbacks
     def on_move(x, y):
-        data = f"move,{x},{y}".encode()
+        data = f"move,{x},{y},".encode()
         broadcast_to_clients(data)
 
     def on_click(x, y, button, pressed):
         if pressed:  # Only send on press, not release
             action = "click" if button == mouse.Button.left else "rightclick"
-            data = f"{action},{x},{y}".encode()
+            data = f"{action},{x},{y},".encode()
             broadcast_to_clients(data)
 
     # Start mouse listener (runs in its own thread internally)

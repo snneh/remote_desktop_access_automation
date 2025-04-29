@@ -33,13 +33,13 @@ def connection_handler():
 
 def mouse_tracker():
     def on_move(x, y):
-        data = f"move,{x},{y}".encode()
+        data = f"move,{x},{y},".encode()
         broadcast_to_clients(data)
 
     def on_click(x, y, button, pressed):
         if pressed:
             action = "click" if button == mouse.Button.left else "rightclick"
-            data = f"{action},{x},{y}".encode()
+            data = f"{action},{x},{y},".encode()
             broadcast_to_clients(data)
 
     with mouse.Listener(on_move=on_move, on_click=on_click) as listener:

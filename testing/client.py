@@ -109,9 +109,7 @@ def handle_keyboard(client_socket):
 def handle_screenshare(client_socket, client_addr):
     while True:
         try:
-            data, addr = client_socket.recvfrom(1024)
-            if data:
-                print(f"Screenshare data from {addr}")
+            client_socket.sendto(4096)
         except Exception as e:
             print(f"Screenshare socket error: {e}")
             break
@@ -139,16 +137,15 @@ def main():
 
     mouse_conn, mouse_addr = mouse_socket.accept()
     keyboard_conn, keyboard_addr = keyboard_socket.accept()
-    # screenshare_socket.connect()
+    screenshare_socket.connect()
 
     threading.Thread(target=handle_mouse, args=(mouse_conn,), daemon=True).start()
     threading.Thread(target=handle_keyboard, args=(keyboard_conn,), daemon=True).start()
 
-    # threading.Thread(
-    #     target=handle_screenshare, args=(screenshare_socket, None), daemon=True
-    # ).start()
+    threading.Thread(
+        target=handle_screenshare, args=(screenshare_socket, None), daemon=True
+    ).start()
 
-    # Main loop to accept TCP connections
     while True:
         try:
             conn, addr = main_server.accept()

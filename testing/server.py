@@ -70,21 +70,6 @@ def keyboard_tracker(keyboard_socket):
         listener.join()
 
 
-# def keyboard_tracker(keyboard_socket):
-#     def on_press(key):
-#         try:
-#             if hasattr(key, "char"):
-#                 data = {"type": "keypress", "key": key.char}
-#             else:
-#                 data = {"type": "keypress", "key": str(key)}
-#             send_data(keyboard_socket, data)
-#         except Exception as e:
-#             print(f"Keyboard error: {e}")
-
-#     with keyboard.Listener(on_press=on_press) as listener:
-#         listener.join()
-
-
 def screenshare_tracker(screenshare_socket):
     while True:
         # Simulate sending screen data (e.g., as a placeholder)

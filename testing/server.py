@@ -3,6 +3,10 @@ import threading
 from pynput import mouse, keyboard
 import time
 import json
+import numpy as np
+import cv2
+import pickle
+import struct
 
 
 # Helper function to send data over a socket
@@ -74,9 +78,41 @@ def screenshare_tracker(screenshare_socket):
     while True:
         # Simulate sending screen data (e.g., as a placeholder)
         try:
-            data = {"type": "screenshare", "frame": "dummy_frame_data"}
-            send_data(screenshare_socket, data)
-            time.sleep(1)  # Simulate frame rate
+            cv2.namedWindow("Remote Screen", cv2.WINDOW_NORMAL)
+
+            # Optional: Set initial window size
+            cv2.resizeWindow("Remote Screen", 800, 600)
+            # Receiving loop
+            data = b""
+            payload_size = struct.calcsize("L")
+
+            while True:
+                # Retrieve message size
+                while len(data) < payload_size:
+                    data += screenshare_socket.recv(4096)
+
+                packed_msg_size = data[:payload_size]
+                data = data[payload_size:]
+                msg_size = struct.unpack("L", packed_msg_size)[0]
+
+                # Retrieve all data based on message size
+                while len(data) < msg_size:
+                    data += screenshare_socket.recv(4096)
+
+                frame_data = data[:msg_size]
+                data = data[msg_size:]
+
+                # Deserialize frame
+                frame = pickle.loads(frame_data)
+                frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+
+                # Display frame
+                cv2.imshow("Remote Screen", frame)
+
+                # Exit on 'q' key press
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
         except Exception as e:
             print(f"Screenshare error: {e}")
             break
@@ -99,12 +135,14 @@ def main():
     try:
         mouse_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         keyboard_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         mouse_socket.connect((HOST, 5001))
         keyboard_socket.connect((HOST, 5002))
-        # screenshare_socket.connect((HOST, 5003))
+        screenshare_socket.bind("0.0.0.0", 5003)
+        screenshare_socket.listen(5)
 
+        screenshare_socket.accept()
         print("All auxiliary sockets connected!")
     except Exception as e:
         print(f"Failed to connect auxiliary sockets: {e}")
@@ -117,13 +155,13 @@ def main():
     keyboard_thread = threading.Thread(
         target=keyboard_tracker, args=(keyboard_socket,), daemon=True
     )
-    # screenshare_thread = threading.Thread(
-    #     target=screenshare_tracker, args=(screenshare_socket,), daemon=True
-    # )
+    screenshare_thread = threading.Thread(
+        target=screenshare_tracker, args=(screenshare_socket,), daemon=True
+    )
 
     mouse_thread.start()
     keyboard_thread.start()
-    # screenshare_thread.start()
+    screenshare_thread.start()
 
     # Keep the main thread running
     try:
@@ -133,7 +171,7 @@ def main():
         print("\nShutting down client.")
         mouse_socket.close()
         keyboard_socket.close()
-        # screenshare_socket.close()
+        screenshare_socket.close()
         main_socket.close()
 
 

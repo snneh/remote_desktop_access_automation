@@ -139,10 +139,8 @@ def main():
 
         mouse_socket.connect((HOST, 5001))
         keyboard_socket.connect((HOST, 5002))
-        screenshare_socket.bind("0.0.0.0", 5003)
-        screenshare_socket.listen(5)
+        screenshare_socket.connect((HOST, 5003))
 
-        screenshare_socket.accept()
         print("All auxiliary sockets connected!")
     except Exception as e:
         print(f"Failed to connect auxiliary sockets: {e}")

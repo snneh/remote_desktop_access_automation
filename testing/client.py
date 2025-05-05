@@ -7,8 +7,8 @@ import mss
 import cv2
 import numpy as np
 import pickle
-import pyautogui
 import struct
+import pyautogui
 
 
 def handle_mouse(client_socket):
@@ -163,25 +163,27 @@ def main():
 
     mouse_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     keyboard_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     mouse_socket.bind(("0.0.0.0", 5001))
     keyboard_socket.bind(("0.0.0.0", 5002))
+    screenshare_socket.bind(("0.0.0.0", 5003))
 
     print("Main server listening.")
 
     mouse_socket.listen()
     keyboard_socket.listen()
+    screenshare_socket.listen()
 
     mouse_conn, mouse_addr = mouse_socket.accept()
     keyboard_conn, keyboard_addr = keyboard_socket.accept()
-    screenshare_socket.connect()
+    screenshare_conn, screenshare_addr = screenshare_socket.accept()
 
     threading.Thread(target=handle_mouse, args=(mouse_conn,), daemon=True).start()
     threading.Thread(target=handle_keyboard, args=(keyboard_conn,), daemon=True).start()
 
     threading.Thread(
-        target=handle_screenshare, args=(screenshare_socket, None), daemon=True
+        target=handle_screenshare, args=(screenshare_conn, None), daemon=True
     ).start()
 
     while True:
@@ -189,12 +191,11 @@ def main():
             conn, addr = main_server.accept()
             print(f"Client connected from {addr}")
             # You can handle the main connection here if needed
-        except KeyboardInterrupt as e:
-            print(f"Error accepting connection: {e}")
-            break
         except KeyboardInterrupt:
             mouse_socket.close()
             keyboard_socket.close()
+            main_server.close()
+            screenshare_socket.close()
 
 
 if __name__ == "__main__":

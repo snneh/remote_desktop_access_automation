@@ -144,7 +144,6 @@ def main():
         print("All auxiliary sockets connected!")
     except Exception as e:
         print(f"Failed to connect auxiliary sockets: {e}")
-        return
 
     # Start threads for mouse, keyboard, and screenshare tracking
     mouse_thread = threading.Thread(

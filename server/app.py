@@ -9,9 +9,10 @@ import numpy as np
 import pickle
 import struct
 import pyautogui
-from tkinter import messagebox
+from tkinter import messagebox, Tk
 import requests
 
+PORT = MOUSE_PORT = KEYBOARD_PORT = SCREENSHARE_PORT = 0
 
 url = "http://localhost:42069/server"
 
@@ -23,12 +24,10 @@ response_data = response.json()
 if "code" in response_data and "port" in response_data:
     code = response_data["code"]
     PORT = response_data["port"]
-    print(f"{code}\n{PORT}")
-
-
-def show_details_and_wait():
-    details = f"Code: {code}\n"
-    messagebox.showinfo("Network Details", details)
+    MOUSE_PORT = response_data["mouse_port"]
+    KEYBOARD_PORT = response_data["keyboard_port"]
+    SCREENSHARE_PORT = response_data["screenshare_port"]
+    print(f"Code : {code}")
 
 
 def handle_mouse(client_socket):
@@ -146,11 +145,21 @@ def handle_screenshare(client_socket, client_addr):
 
                 # Get cursor position
                 cursor_x, cursor_y = pyautogui.position()
-                cursor_color = (0, 0, 255)  # Red color for the cursor
-                cursor_radius = 7  # Radius of the red dot
-
-                # Draw red dot at the cursor position
-                cv2.circle(img, (cursor_x, cursor_y), cursor_radius, cursor_color, -1)
+                cursor_x = min(
+                    max(cursor_x, monitor["left"]),
+                    monitor["left"] + monitor["width"] - 1,
+                )
+                cursor_y = min(
+                    max(cursor_y, monitor["top"]),
+                    monitor["top"] + monitor["height"] - 1,
+                )
+                cv2.circle(
+                    img,
+                    (cursor_x - monitor["left"], cursor_y - monitor["top"]),
+                    7,
+                    (0, 0, 255),
+                    -1,
+                )
 
                 # Convert image to BGR format
                 frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -185,15 +194,14 @@ def main():
     keyboard_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    mouse_socket.bind(("0.0.0.0", 5001))
-    keyboard_socket.bind(("0.0.0.0", 5002))
-    screenshare_socket.bind(("0.0.0.0", 5003))
+    mouse_socket.bind(("0.0.0.0", MOUSE_PORT))
+    keyboard_socket.bind(("0.0.0.0", KEYBOARD_PORT))
+    screenshare_socket.bind(("0.0.0.0", SCREENSHARE_PORT))
 
     print("Main server listening.")
-
-    mouse_socket.listen()
-    keyboard_socket.listen()
-    screenshare_socket.listen()
+    mouse_socket.listen(5)
+    keyboard_socket.listen(5)
+    screenshare_socket.listen(5)
 
     mouse_conn, mouse_addr = mouse_socket.accept()
     keyboard_conn, keyboard_addr = keyboard_socket.accept()
@@ -216,6 +224,7 @@ def main():
             keyboard_socket.close()
             main_server.close()
             screenshare_socket.close()
+            return
 
 
 if __name__ == "__main__":

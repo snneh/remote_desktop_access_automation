@@ -7,12 +7,14 @@ import numpy as np
 import cv2
 import pickle
 import struct
-from tkinter import messagebox
+from tkinter import messagebox, Tk, simpledialog
 import requests
 
 
 HOST = "localhost"
 PORT = 12345
+MOUSE_PORT = KEYBOARD_PORT = SCREENSHARE_PORT = 0
+
 
 code = input("Code: ")
 url = "http://localhost:6969/client"
@@ -26,10 +28,20 @@ try:
     if "localIP" in response_data and "port" in response_data:
         HOST = response_data["localIP"]
         PORT = response_data["port"]
+        MOUSE_PORT = response_data["mouse_port"]
+        KEYBOARD_PORT = response_data["keyboard_port"]
+        SCREENSHARE_PORT = response_data["screenshare_port"]
     else:
         print("Invalid response data")
 except ValueError:
     print("Invalid JSON response")
+
+print(
+    f"Connecting to {HOST} with ports: Main={PORT}, Mouse={MOUSE_PORT}, Keyboard={KEYBOARD_PORT}, Screenshare={SCREENSHARE_PORT}"
+)
+
+
+shutdown_event = threading.Event()
 
 
 # Helper function to send data over a socket
@@ -42,19 +54,22 @@ def send_data(sock, data):
 
 
 def mouse_tracker(mouse_socket):
-    def on_move(x, y):
-        data = {"type": "move", "x": x, "y": y}
-        send_data(mouse_socket, data)
+    try:
 
-    def on_click(x, y, button, pressed):
-        if pressed:
-            action = "click" if button == mouse.Button.left else "rightclick"
-            data = {"type": action, "x": x, "y": y}
+        def on_move(x, y):
+            data = {"type": "move", "x": x, "y": y}
             send_data(mouse_socket, data)
 
-    # Start mouse listener
-    with mouse.Listener(on_move=on_move, on_click=on_click) as listener:
-        listener.join()
+        def on_click(x, y, button, pressed):
+            if pressed:
+                action = "click" if button == mouse.Button.left else "rightclick"
+                data = {"type": action, "x": x, "y": y}
+                send_data(mouse_socket, data)
+
+        with mouse.Listener(on_move=on_move, on_click=on_click) as listener:
+            listener.join()
+    except Exception as e:
+        print(f"Mouse tracker error: {e}")
 
 
 # Set of currently pressed keys
@@ -142,54 +157,72 @@ def screenshare_tracker(screenshare_socket):
 
 
 def main():
-    # Connect to the main server
     try:
         main_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         main_socket.connect((HOST, PORT))
         print(f"Connected to main server at {HOST}:{PORT}")
-    except Exception as e:
-        print(f"Could not connect to main server: {e}")
-        return
 
-    # Set up additional sockets for mouse, keyboard, and screenshare
-    try:
         mouse_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         keyboard_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         screenshare_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        mouse_socket.connect((HOST, 5001))
-        keyboard_socket.connect((HOST, 5002))
-        screenshare_socket.connect((HOST, 5003))
+        mouse_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        keyboard_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        screenshare_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        print("All auxiliary sockets connected!")
-    except Exception as e:
-        print(f"Failed to connect auxiliary sockets: {e}")
+        try:
+            mouse_socket.connect((HOST, MOUSE_PORT))
+        except Exception as e:
+            print(f"Mouse socket connection failed: {e}")
+            mouse_socket = None
 
-    # Start threads for mouse, keyboard, and screenshare tracking
-    mouse_thread = threading.Thread(
-        target=mouse_tracker, args=(mouse_socket,), daemon=True
-    )
-    keyboard_thread = threading.Thread(
-        target=keyboard_tracker, args=(keyboard_socket,), daemon=True
-    )
-    screenshare_thread = threading.Thread(
-        target=screenshare_tracker, args=(screenshare_socket,), daemon=True
-    )
+        try:
+            keyboard_socket.connect((HOST, KEYBOARD_PORT))
+        except Exception as e:
+            print(f"Keyboard socket connection failed: {e}")
+            keyboard_socket = None
 
-    mouse_thread.start()
-    keyboard_thread.start()
-    screenshare_thread.start()
+        try:
+            screenshare_socket.connect((HOST, SCREENSHARE_PORT))
+        except Exception as e:
+            print(f"Screenshare socket connection failed: {e}")
+            screenshare_socket = None
 
-    # Keep the main thread running
-    try:
-        while True:
+        if not (mouse_socket or keyboard_socket or screenshare_socket):
+            print("All auxiliary sockets failed to connect. Exiting.")
+            return
+
+        mouse_thread = threading.Thread(
+            target=mouse_tracker, args=(mouse_socket,), daemon=True
+        )
+        keyboard_thread = threading.Thread(
+            target=keyboard_tracker, args=(keyboard_socket,), daemon=True
+        )
+        screenshare_thread = threading.Thread(
+            target=screenshare_tracker, args=(screenshare_socket,), daemon=True
+        )
+
+        mouse_thread.start()
+        keyboard_thread.start()
+        screenshare_thread.start()
+
+        while not shutdown_event.is_set():
             time.sleep(1)
+
     except KeyboardInterrupt:
         print("\nShutting down client.")
-        mouse_socket.close()
-        keyboard_socket.close()
-        screenshare_socket.close()
-        main_socket.close()
+        shutdown_event.set()
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+    finally:
+        print("Closing sockets.")
+        try:
+            mouse_socket.close()
+            keyboard_socket.close()
+            screenshare_socket.close()
+            main_socket.close()
+        except Exception as cleanup_error:
+            print(f"Error during cleanup: {cleanup_error}")
 
 
 if __name__ == "__main__":

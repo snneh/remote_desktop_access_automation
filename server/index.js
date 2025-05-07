@@ -50,7 +50,33 @@ app.post("/server", (req, res) => {
     });
 
     const port = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
+    const mouse_port = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
+    const keyboard_port = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
+    const screenshare_port =
+      Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
 
+    const ensureUniquePorts = (ports) => {
+      const uniquePorts = new Set(ports);
+      while (uniquePorts.size < ports.length) {
+        uniquePorts.add(Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024);
+      }
+      return Array.from(uniquePorts);
+    };
+
+    const [
+      uniquePort,
+      uniqueMousePort,
+      uniqueKeyboardPort,
+      uniqueScreensharePort,
+    ] = ensureUniquePorts([port, mouse_port, keyboard_port, screenshare_port]);
+
+    console.log(
+      "Unique Ports:",
+      uniquePort,
+      uniqueMousePort,
+      uniqueKeyboardPort,
+      uniqueScreensharePort
+    );
     const sendIP = async (publicIP, localIP) => {
       try {
         const response = await axios.post(
@@ -59,7 +85,10 @@ app.post("/server", (req, res) => {
             publicIP: publicIP,
             localIP: localIP,
             code: code,
-            port: port,
+            port: uniquePort,
+            mouse_port: uniqueMousePort,
+            keyboard_port: uniqueKeyboardPort,
+            screenshare_port: uniqueScreensharePort,
           }
         );
         const response1 = response.data;
